@@ -14,7 +14,6 @@ export default function App() {
       <QRBarcodeBillingApp/>
       {/* <BarcodeScanner /> */}
       <Cart/>
-
       {/* <Counter /> */}
       {/* <Switch> */}
         <Routes>
