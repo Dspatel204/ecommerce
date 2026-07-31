@@ -239,45 +239,27 @@ export default function GSTBillSample() {
     <section className="w-full max-w-5xl space-y-6">
       {/* Bill sample preview */}
       <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-        <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-            <span className="font-semibold text-gray-900 dark:text-white">
-              GST Bill Sample
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{date}</span>
-          </div>
-        </div>
-
-        {/* Brand / Business header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        {/* Colored header band */}
+        <div className="bg-primary-700 dark:bg-primary-800 px-6 py-4 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/30 text-2xl">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 text-2xl">
               {BRAND.logo}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {BRAND.name}
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {BRAND.tagline}
-              </p>
+              <h2 className="text-xl font-bold">{BRAND.name}</h2>
+              <p className="text-xs text-white/80">{BRAND.tagline}</p>
+              <p className="text-xs text-white/80">GSTIN: {BRAND.gstin}</p>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-1 text-sm">
-            <p className="text-gray-700 dark:text-gray-300">
-              <span className="font-medium text-gray-900 dark:text-gray-200">
-                GSTIN:
-              </span>{" "}
-              {BRAND.gstin}
-            </p>
-            <p className="text-gray-700 dark:text-gray-300">{BRAND.address}</p>
-            <p className="text-gray-700 dark:text-gray-300">
-              {BRAND.phone} | {BRAND.email}
-            </p>
+          <div className="flex items-center gap-3 text-right text-sm">
+            <Receipt className="h-5 w-5 text-white/80" />
+            <div>
+              <p className="text-lg font-bold">TAX INVOICE</p>
+              <p className="text-xs text-white/90">{BRAND.address}</p>
+              <p className="text-xs text-white/90">
+                {BRAND.phone} | {BRAND.email}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -323,39 +305,28 @@ export default function GSTBillSample() {
         <div className="overflow-x-auto px-6 py-4">
           <table className="w-full table-fixed text-sm">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
-                <th className="pb-2 text-left font-medium text-gray-900 dark:text-gray-200">
-                  Item
+              <tr className="bg-primary-700 dark:bg-primary-800 text-white">
+                <th className="py-2 pr-2 text-center text-xs font-medium">
+                  S.No
                 </th>
-                <th className="pb-2 text-center font-medium text-gray-900 dark:text-gray-200">
-                  Qty
-                </th>
-                <th className="pb-2 text-right font-medium text-gray-900 dark:text-gray-200">
-                  Price
-                </th>
-                <th className="pb-2 text-center font-medium text-gray-900 dark:text-gray-200">
-                  GST%
-                </th>
-                <th className="pb-2 text-right font-medium text-gray-900 dark:text-gray-200">
-                  GST Amt
-                </th>
-                <th className="pb-2 text-right font-medium text-gray-900 dark:text-gray-200">
-                  Total
-                </th>
-                <th className="pb-2 text-right font-medium text-gray-900 dark:text-gray-200">
-                  Action
-                </th>
+                <th className="py-2 text-left text-xs font-medium">Item</th>
+                <th className="py-2 text-center text-xs font-medium">Qty</th>
+                <th className="py-2 text-right text-xs font-medium">Price</th>
+                <th className="py-2 text-center text-xs font-medium">GST%</th>
+                <th className="py-2 text-right text-xs font-medium">GST Amt</th>
+                <th className="py-2 text-right text-xs font-medium">Total</th>
+                <th className="py-2 text-right text-xs font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="py-6 text-center text-gray-500 dark:text-gray-400">
                     No items in cart.
                   </td>
                 </tr>
               ) : (
-                items.map((item) => {
+                items.map((item, i) => {
                   const gstAmt =
                     (item.price * item.qty * item.gst_rate) / 100;
                   const itemTotal = item.price * item.qty + gstAmt;
@@ -364,6 +335,9 @@ export default function GSTBillSample() {
                       key={item.id}
                       className="border-b border-gray-200 dark:border-gray-700"
                     >
+                      <td className="py-2 text-center text-gray-800 dark:text-gray-200">
+                        {i + 1}
+                      </td>
                       <td className="py-2 pr-2 text-gray-800 dark:text-gray-200">
                         {item.name}
                       </td>
@@ -443,10 +417,10 @@ export default function GSTBillSample() {
                 </span>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+              <div className="border-t-2 border-primary-700 dark:border-primary-400 pt-2">
                 <div className="flex justify-between">
                   <span className="font-semibold text-gray-900 dark:text-white">
-                    Total Amount
+                    Grand Total
                   </span>
                   <span className="text-xl font-bold text-primary-700 dark:text-primary-400">
                     {INR(totals.total)}
