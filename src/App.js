@@ -1,26 +1,36 @@
-import { Counter } from "./features/counter/Counter";
 import "./styles.css";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-import { BrowserRouter, Routes, Route, Switch } from "react-router-dom";
-// import Cart from "./features/counter/Blogs";
-import Cart from "./features/counter/CartPage";
-import { BarcodeScanner } from "react-barcode-scanner";
-import QRBarcodeBillingApp from "./features/counter/BillingApp";
-export default function App() {
+import { Outlet, Routes, Route } from "react-router-dom";
+import { CartProvider } from "./context/CartContext";
+import Header from "./components/Header";
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import Categories from "./pages/Categories";
+import QRCode from "./pages/QRCode";
+
+function RootLayout() {
   return (
-    <div className="App">
-      <p>make a bil</p>
-      <QRBarcodeBillingApp/>
-      {/* <BarcodeScanner /> */}
-      <Cart/>
-      {/* <Counter /> */}
-      {/* <Switch> */}
-        <Routes>
-        {/* <Route path="/" Component={<Counter />}></Route> */}
-        {/* <Route path="addtocart" Component={<Cart />} /> */}
-        </Routes>
-      {/* </Switch>{" "} */}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
+      <Header />
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Outlet />
+      </main>
     </div>
   );
-} 
+}
+
+export default function App() {
+  return (
+    <CartProvider>
+      <Routes>
+        <Route path="/" element={<RootLayout />}>
+          <Route index element={<Home />} />
+          <Route path="products" element={<Products />} />
+          <Route path="categories" element={<Categories />} />
+          <Route path="qr-code" element={<QRCode />} />
+        </Route>
+      </Routes>
+    </CartProvider>
+  );
+}
