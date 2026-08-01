@@ -97,8 +97,16 @@ export async function payWithRazorpay({
         );
   }
 
+  const keyId = process.env.REACT_APP_RAZORPAY_KEY_ID;
+  if (!keyId) {
+    throw new Error(
+      "Razorpay key is not configured. " +
+        "Add REACT_APP_RAZORPAY_KEY_ID to your Vercel environment variables and redeploy."
+    );
+  }
+
   const options = {
-    key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+    key: keyId,
     amount: orderAmount,
     currency,
     name,
@@ -106,7 +114,12 @@ export async function payWithRazorpay({
     order_id: orderId,
     prefill,
     theme: { color: "#0ea5e9" },
-    handler: () => onSuccess(),
+    handler: (response) => onSuccess(response),
+    modal: {
+      ondismiss: () => {
+        // User closed the Razorpay popup — not an error, no-op
+      },
+    },
   };
 
   const rzp = new window.Razorpay(options);
