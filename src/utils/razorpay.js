@@ -56,19 +56,45 @@ export async function payWithRazorpay({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount, currency }),
     });
-    const order = await res.json();
+
+    const raw = await res.text().catch(() => "");
+    if (!res.ok) {
+      throw new Error(
+        `Could not create a Razorpay order (HTTP ${res.status}). ` +
+          `Make sure the backend is running (npm run dev) and RAZORPAY_KEY_ID / ` +
+          `RAZORPAY_KEY_SECRET are set. Response: ${raw.slice(0, 200)}`
+      );
+    }
+
+    let order;
+    if (raw) {
+      try {
+        order = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Invalid order response from /api/create-order: ${raw.slice(0, 200)}`
+        );
+      }
+    } else {
+      order = {};
+    }
+
     if (!order || !order.id) {
       throw new Error(
-        order?.error?.description || "Could not create a Razorpay order."
+        order?.error?.description ||
+          "Could not create a Razorpay order (no order id returned)."
       );
     }
     orderId = order.id;
     if (typeof order.amount === "number") orderAmount = order.amount;
   } catch (err) {
-    throw new Error(
-      err?.message ||
-        "Payment order could not be created. A backend (server.js or the Vercel api/create-order function) and valid RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET are required."
-    );
+    throw err instanceof Error
+      ? err
+      : new Error(
+          "Payment order could not be created. A backend (server.js or the Vercel " +
+            "api/create-order function) and valid RAZORPAY_KEY_ID / " +
+            "RAZORPAY_KEY_SECRET are required."
+        );
   }
 
   const options = {
