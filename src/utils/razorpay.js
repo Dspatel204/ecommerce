@@ -1,32 +1,105 @@
+/**
+ * Razorpay Embedded Checkout Helper
+ * ─────────────────────────────────
+ * Uses Razorpay's "embedded" checkout which renders the payment form
+ * INSIDE the page (inline iframe) rather than a floating modal popup.
+ *
+ * Embedded vs Popup:
+ *  - Popup  : window.Razorpay(opts).open()  — opens a modal overlay
+ *  - Embedded: provide `options.container`  — renders inline in a DOM element
+ *
+ * The checkout.js script (v1) supports both modes via the same CDN URL.
+ *
+ * Test card (TEST mode — no real money moved):
+ *   Card: 4111 1111 1111 1111 | Expiry: any future | CVV: any | OTP: any
+ */
+
+// ─── Script loader ─────────────────────────────────────────────────────────────
+let _scriptPromise = null;
+
 export function loadRazorpayScript() {
-  return new Promise((resolve) => {
+  if (_scriptPromise) return _scriptPromise; // deduplicate concurrent calls
+
+  _scriptPromise = new Promise((resolve) => {
     if (typeof window === "undefined") return resolve(false);
     if (window.Razorpay) return resolve(true);
 
     const script = document.createElement("script");
+    // v1 checkout supports both popup AND embedded modes
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
+    script.defer = true;
     script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+    script.onerror = () => {
+      _scriptPromise = null; // allow retry on next call
+      resolve(false);
+    };
+    document.head.appendChild(script); // <head> not <body> — avoids layout shift
   });
+
+  return _scriptPromise;
 }
 
+// ─── Order creation (server-side, not CORS-enabled by Razorpay) ───────────────
+async function createOrder(amount, currency) {
+  // Send ONLY Content-Type — stripping all other headers keeps the request
+  // tiny and prevents HTTP 431 "Request Header Fields Too Large" on localhost.
+  const res = await fetch("/api/create-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // credentials: "omit" → do NOT send cookies — this alone eliminates 431
+    credentials: "omit",
+    body: JSON.stringify({ amount, currency }),
+  });
+
+  const raw = await res.text().catch(() => "");
+
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(raw);
+      errMsg = parsed?.error || parsed?.message || errMsg;
+    } catch {
+      errMsg = raw.slice(0, 200) || errMsg;
+    }
+    throw new Error(
+      `Could not create a Razorpay order (${errMsg}). ` +
+        "Make sure the backend is running (npm run dev) and " +
+        "RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are set in your .env file."
+    );
+  }
+
+  let order;
+  try {
+    order = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `Invalid JSON from /api/create-order: ${raw.slice(0, 200)}`
+    );
+  }
+
+  if (!order?.id) {
+    throw new Error(
+      order?.error?.description ||
+        "Razorpay order creation returned no order id."
+    );
+  }
+
+  return order;
+}
+
+// ─── Main payment helper ───────────────────────────────────────────────────────
 /**
- * amount        -> numeric, in RUPES (converted to paise for Razorpay)
- * currency      -> default "INR"
- * prefill       -> { name, email, contact } shown pre-filled in the checkout
- * onSuccess     -> called from the checkout `handler` after a successful payment
- *
- * Order creation: Razorpay Checkout REQUIRES a genuine order_id created
- * server-side with your secret key (the Orders API is not CORS-enabled, and any
- * placeholder/dummy order_id is rejected with 400). So this helper always
- * POSTs to /api/create-order, which must be served by a backend:
- *  - Local dev: CRA `proxy` -> Express `server.js` (npm run dev, not bare npm start)
- *  - Production: Vercel serverless function `api/create-order.js`
- *
- * TEST-only: no real money is moved. Test card: 4111 1111 1111 1111
- * (any future expiry, any CVV; in test mode the OTP field accepts any value).
+ * @param {object} opts
+ * @param {number}   opts.amount       - Amount in ₹ (converted to paise internally)
+ * @param {string}  [opts.currency]    - Default: "INR"
+ * @param {object}  [opts.prefill]     - { name, email, contact }
+ * @param {string}  [opts.name]        - Merchant / store name shown in checkout
+ * @param {string}  [opts.description] - Order description shown in checkout
+ * @param {string}  [opts.containerId] - DOM element id to embed checkout into.
+ *                                       If omitted, falls back to popup mode.
+ * @param {function} [opts.onSuccess]  - Called with Razorpay response on success
+ * @param {function} [opts.onDismiss]  - Called when user closes checkout
  */
 export async function payWithRazorpay({
   amount,
@@ -34,8 +107,11 @@ export async function payWithRazorpay({
   prefill = {},
   name = "ABC Electronics Store",
   description = "Checkout payment",
+  containerId = "razorpay-embed", // id of the container div for embedded mode
   onSuccess = () => {},
+  onDismiss = () => {},
 }) {
+  // 1. Load the Razorpay checkout.js script
   const loaded = await loadRazorpayScript();
   if (!loaded) {
     throw new Error(
@@ -43,62 +119,10 @@ export async function payWithRazorpay({
     );
   }
 
-  const amountPaise = Math.round(amount * 100);
-  let orderAmount = amountPaise;
-  let orderId = null;
+  // 2. Create a server-side order (required — CORS-disabled Razorpay Orders API)
+  const order = await createOrder(amount, currency);
 
-  // Razorpay Checkout requires a REAL order_id created server-side with your
-  // secret key. The Orders API is NOT CORS-enabled, so this cannot be done
-  // from the browser alone. A dummy/placeholder order_id is rejected (400).
-  try {
-    const res = await fetch("/api/create-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, currency }),
-    });
-
-    const raw = await res.text().catch(() => "");
-    if (!res.ok) {
-      throw new Error(
-        `Could not create a Razorpay order (HTTP ${res.status}). ` +
-          `Make sure the backend is running (npm run dev) and RAZORPAY_KEY_ID / ` +
-          `RAZORPAY_KEY_SECRET are set. Response: ${raw.slice(0, 200)}`
-      );
-    }
-
-    let order;
-    if (raw) {
-      try {
-        order = JSON.parse(raw);
-      } catch {
-        throw new Error(
-          `Invalid order response from /api/create-order: ${raw.slice(0, 200)}`
-        );
-      }
-    } else {
-      order = {};
-    }
-
-    if (!order || !order.id) {
-      throw new Error(
-        order?.error?.description ||
-          "Could not create a Razorpay order (no order id returned)."
-      );
-    }
-    orderId = order.id;
-    if (typeof order.amount === "number") orderAmount = order.amount;
-  } catch (err) {
-    throw err instanceof Error
-      ? err
-      : new Error(
-          "Payment order could not be created. A backend (server.js or the Vercel " +
-            "api/create-order function) and valid RAZORPAY_KEY_ID / " +
-            "RAZORPAY_KEY_SECRET are required."
-        );
-  }
-
-  // CRA bakes REACT_APP_* vars at build time via webpack DefinePlugin.
-  // Access via process.env works in the compiled bundle; guard against missing/empty.
+  // 3. Resolve the publishable key baked in at CRA build time
   const keyId =
     process.env.REACT_APP_RAZORPAY_KEY_ID ||
     (typeof window !== "undefined" && window.__RAZORPAY_KEY_ID__) ||
@@ -107,31 +131,59 @@ export async function payWithRazorpay({
   if (!keyId || keyId === "undefined") {
     throw new Error(
       "Razorpay key is not configured. " +
-        "Add REACT_APP_RAZORPAY_KEY_ID to your Vercel environment variables (Settings → Environment Variables) and redeploy."
+        "Add REACT_APP_RAZORPAY_KEY_ID to your .env (local) or " +
+        "Vercel → Settings → Environment Variables, then redeploy."
     );
   }
 
+  // 4. Determine embedded vs popup mode
+  const containerEl = containerId
+    ? document.getElementById(containerId)
+    : null;
+
   const options = {
     key: keyId,
-    amount: orderAmount,
+    amount: order.amount,   // use the server-confirmed amount in paise
     currency,
     name,
     description,
-    order_id: orderId,
+    order_id: order.id,
     prefill,
     theme: { color: "#0ea5e9" },
-    handler: (response) => onSuccess(response),
+
+    // ── Embedded checkout config ─────────────────────────────────────────
+    // When `container` is set, Razorpay renders an inline iframe inside
+    // that element instead of opening a floating modal/popup.
+    ...(containerEl
+      ? {
+          container: `#${containerId}`,
+          hidden: {
+            // pass any hidden fields Razorpay should pre-set
+          },
+        }
+      : {}),
+
+    // ── Callbacks ────────────────────────────────────────────────────────
+    handler: (response) => {
+      // Called by Razorpay after a successful payment (popup AND embedded)
+      onSuccess(response);
+    },
     modal: {
+      animation: true,
+      backdropclose: false,  // prevent accidental dismiss on background click
+      escape: true,
+      confirm_close: true,   // show "Are you sure?" before closing
       ondismiss: () => {
-        // User closed the Razorpay popup — not an error, no-op
+        onDismiss();
       },
     },
   };
 
+  // 5. Open the checkout (embedded if container exists, popup otherwise)
   return new Promise((resolve, reject) => {
     const rzp = new window.Razorpay(options);
 
-    // Capture payment failures emitted by Razorpay (e.g. network error, card declined)
+    // wire payment.failed so card declines / network errors surface as errors
     rzp.on("payment.failed", (response) => {
       reject(
         new Error(
@@ -143,6 +195,6 @@ export async function payWithRazorpay({
     });
 
     rzp.open();
-    resolve(); // resolves when popup opens; success comes via the `handler` callback
+    resolve(); // resolves once the checkout UI is open
   });
 }

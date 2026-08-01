@@ -51,7 +51,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
-    "server": "node server.js",
+    "server": "node --max-http-header-size=65536 server.js",
     "dev": "concurrently \"npm start\" \"npm run server\""
   },
   "browserslist": [

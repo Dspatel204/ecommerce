@@ -86,9 +86,14 @@ export default function Checkout() {
           email: form.email,
           contact: form.phone,
         },
+        // Embedded mode: renders the Razorpay form inline inside #razorpay-embed
+        containerId: "razorpay-embed",
         onSuccess: () => {
           setPaid(true);
           clearCart();
+        },
+        onDismiss: () => {
+          setLoading(false);
         },
       });
     } catch (err) {
@@ -244,8 +249,16 @@ export default function Checkout() {
               {apiError}
             </p>
           )}
+
+          {/* Razorpay embedded checkout container — the payment iframe renders here */}
+          <div
+            id="razorpay-embed"
+            className="w-full overflow-hidden rounded-xl"
+            style={{ minHeight: loading ? "420px" : "0" }}
+          />
+
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
-            Test gateway — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry & any CVV.
+            Test gateway — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry &amp; any CVV.
           </p>
         </div>
       </div>
