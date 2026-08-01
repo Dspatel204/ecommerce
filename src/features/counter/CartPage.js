@@ -3,6 +3,7 @@ import axios from "axios";
 import { Box, Modal } from "@mui/material";
 import Slider from "react-slick";
 import { useCart } from "../../context/CartContext";
+import { payWithRazorpay } from "../../utils/razorpay";
 import Pagination from "../../components/Pagination";
 
 const PAGE_SIZE = 16;
@@ -13,13 +14,14 @@ export default function Cart() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const {
-    cartData,
+     cartData,
     addToCart,
     removeFromCart,
     isCartOpen,
     closeCart,
     toggleCart,
   } = useCart();
+  const [buyNowLoading, setBuyNowLoading] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -48,6 +50,25 @@ export default function Cart() {
     slidesToShow: 2,
     slidesToScroll: 1,
     arrows: true,
+  };
+
+  const handleBuyNow = async (item) => {
+    setBuyNowLoading(true);
+    try {
+      await payWithRazorpay({
+        amount: item.price,
+        currency: "INR",
+        prefill: {},
+        onSuccess: () => {
+          alert("Payment successful!");
+          addToCart(item);
+        },
+      });
+    } catch (err) {
+      alert(err?.message || "Payment could not be initiated.");
+    } finally {
+      setBuyNowLoading(false);
+    }
   };
 
   return (
@@ -91,6 +112,14 @@ export default function Cart() {
               </p>
               <button type="button" onClick={() => addToCart(item)}>
                 Add to Cart
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBuyNow(item)}
+                disabled={buyNowLoading}
+                className="ml-2 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {buyNowLoading ? "Processing..." : "Buy Now"}
               </button>
             </div>
           ))}

@@ -139,6 +139,24 @@ Local setup:
 4. Open `/checkout`, add items, fill the billing form, and click **Pay with Razorpay** to open the embedded checkout.
 
 > To run the backend locally **without** Express (using the same function the cloud uses), run `npx vercel dev`.
+>
+> ### Instant "Buy Now" button + embedded test gateway
+>
+> **Important:** Razorpay Checkout requires a **real `order_id`** created server-side with your secret. The Orders API is not CORS-enabled in the browser, and a dummy/placeholder `order_id` is rejected with `400 "… is not a valid id"`. So the gateway **requires** the backend — there is no purely-react-only mode. (Verified: `curl` to `api.razorpay.com/v1/orders` returns no `Access-Control-Allow-Origin` header.)
+>
+> The payment flow is centralized in `src/utils/razorpay.js` → `payWithRazorpay({ amount, prefill, onSuccess })`:
+>
+> 1. Loads `checkout.razorpay.com/v1/checkout.js` on demand.
+> 2. `POST /api/create-order { amount, currency }` → real Razorpay order (`order.id`, `amount` in paise).
+> 3. Opens `new window.Razorpay({ key, order_id, amount, currency, prefill, handler })` — the embedded Checkout popup.
+> 4. `handler` (success) → `onSuccess` callback (Checkout clears the cart + shows success; Buy Now alerts + adds to cart).
+>
+> - **Local:** CRA `proxy` → Express `server.js` on `:5000` (run **`npm run dev`**, *not* bare `npm start`).
+> - **Vercel:** `api/create-order.js` serverless function (declared in `vercel.json`) on the same deploy.
+>
+> Each product card on the **Product Store** has a **Buy Now** button that calls `payWithRazorpay({ amount: item.price })`.
+>
+> **Test card:** `4111 1111 1111 1111`, any future expiry, any CVV. In test mode the OTP field accepts any value.
 
 ## Notes
 

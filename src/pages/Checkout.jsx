@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
-import { CreditCard, Trash2, CheckCircle } from "lucide-react";
+import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
-import { loadRazorpayScript } from "../utils/razorpay";
+import { payWithRazorpay } from "../utils/razorpay";
 
 const INR = (n) =>
   new Intl.NumberFormat("en-IN", {
@@ -33,11 +32,26 @@ export default function Checkout() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const total = cartData.reduce(
     (sum, item) => sum + item.price * (item.quantity || 1),
     0
   );
+
+  if (cartData.length === 0) {
+    return (
+      <section className="py-20 text-center">
+        <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
+        <h2 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
+          Your cart is empty
+        </h2>
+        <p className="mt-2 text-gray-600 dark:text-gray-300">
+          Add some products before checking out.
+        </p>
+      </section>
+    );
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,50 +75,27 @@ export default function Checkout() {
 
   const handlePay = async () => {
     if (!validate() || cartData.length === 0) return;
+    setApiError("");
     setLoading(true);
     try {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) {
-        throw new Error(
-          "Razorpay checkout could not be loaded. Please check your internet connection."
-        );
-      }
-
-      const { data: order } = await axios.post("/api/create-order", {
+      await payWithRazorpay({
         amount: total,
         currency: "INR",
-      });
-
-      if (!order || !order.id) {
-        throw new Error(
-          order?.error?.description || "Could not create a payment order."
-        );
-      }
-
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency,
-        name: "ABC Electronics Store",
-        description: "Checkout payment",
-        order_id: order.id,
-        handler: () => {
-          setPaid(true);
-          clearCart();
-        },
         prefill: {
           name: form.name,
           email: form.email,
           contact: form.phone,
         },
-        theme: { color: "#0ea5e9" },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+        onSuccess: () => {
+          setPaid(true);
+          clearCart();
+        },
+      });
     } catch (err) {
       console.error(err);
-      alert(err.message || "Payment could not be initiated.");
+      setApiError(
+        err?.message || "Payment could not be initiated. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -112,36 +103,34 @@ export default function Checkout() {
 
   if (paid) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-          <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+      <section className="py-20 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+          <svg
+            className="h-8 w-8 text-green-600 dark:text-green-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m5.615 3.905a2.75 2.75 0 11-5.5 0 2.75 2.75 0 015.5 0z"
+            />
+          </svg>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Payment Successful!
         </h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Your order has been placed. A receipt has been sent to your email.
-        </p>
-      </section>
-    );
-  }
-
-  if (cartData.length === 0) {
-    return (
-      <section className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-        <Trash2 className="h-8 w-8 text-gray-400 dark:text-gray-500" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Your cart is empty
-        </h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Add some products before checking out.
+        <p className="mt-2 text-gray-600 dark:text-gray-300">
+          Your order has been placed and your cart has been cleared.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="w-full max-w-5xl space-y-6">
+    <section className="mx-auto w-full max-w-4xl space-y-6 py-10">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">
           Checkout
@@ -169,7 +158,7 @@ export default function Checkout() {
                 type={field.type}
                 value={form[field.name]}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-primary-600 focus:ring-primary-500 shadow-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-600 focus:ring-primary-500"
               />
               {errors[field.name] && (
                 <p className="mt-1 text-xs text-red-500">{errors[field.name]}</p>
@@ -178,7 +167,7 @@ export default function Checkout() {
           ))}
         </div>
 
-        {/* Cart summary + payment */}
+        {/* Cart summary + pay */}
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
             <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
@@ -211,9 +200,7 @@ export default function Checkout() {
                 </div>
               ))}
               <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
-                <span className="text-gray-600 dark:text-gray-300">
-                  Total Amount
-                </span>
+                <span className="text-gray-600 dark:text-gray-300">Total</span>
                 <span className="text-lg font-bold text-primary-700 dark:text-primary-400">
                   {INR(total)}
                 </span>
@@ -234,11 +221,32 @@ export default function Checkout() {
               </>
             ) : (
               <>
-                <CreditCard className="h-5 w-5" />
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 10h4l3-3 4 0 3 3 3 0v11a2 2 0 01-2 2H5a2 2 0 01-2-2V10z"
+                  />
+                </svg>
                 Pay {INR(total)} with Razorpay
               </>
             )}
           </button>
+
+          {apiError && (
+            <p className="rounded-md border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+              {apiError}
+            </p>
+          )}
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            Test gateway — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry & any CVV.
+          </p>
         </div>
       </div>
     </section>
