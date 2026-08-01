@@ -97,11 +97,17 @@ export async function payWithRazorpay({
         );
   }
 
-  const keyId = process.env.REACT_APP_RAZORPAY_KEY_ID;
-  if (!keyId) {
+  // CRA bakes REACT_APP_* vars at build time via webpack DefinePlugin.
+  // Access via process.env works in the compiled bundle; guard against missing/empty.
+  const keyId =
+    process.env.REACT_APP_RAZORPAY_KEY_ID ||
+    (typeof window !== "undefined" && window.__RAZORPAY_KEY_ID__) ||
+    "";
+
+  if (!keyId || keyId === "undefined") {
     throw new Error(
       "Razorpay key is not configured. " +
-        "Add REACT_APP_RAZORPAY_KEY_ID to your Vercel environment variables and redeploy."
+        "Add REACT_APP_RAZORPAY_KEY_ID to your Vercel environment variables (Settings → Environment Variables) and redeploy."
     );
   }
 
@@ -122,6 +128,21 @@ export async function payWithRazorpay({
     },
   };
 
-  const rzp = new window.Razorpay(options);
-  rzp.open();
+  return new Promise((resolve, reject) => {
+    const rzp = new window.Razorpay(options);
+
+    // Capture payment failures emitted by Razorpay (e.g. network error, card declined)
+    rzp.on("payment.failed", (response) => {
+      reject(
+        new Error(
+          response?.error?.description ||
+            response?.error?.reason ||
+            "Payment failed. Please try again."
+        )
+      );
+    });
+
+    rzp.open();
+    resolve(); // resolves when popup opens; success comes via the `handler` callback
+  });
 }
