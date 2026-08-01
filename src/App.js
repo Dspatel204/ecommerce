@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Products from "./pages/Products";
 import Categories from "./pages/Categories";
 import QRCode from "./pages/QRCode";
+import Checkout from "./pages/Checkout";
 
 function RootLayout() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="products" element={<Products />} />
           <Route path="categories" element={<Categories />} />
           <Route path="qr-code" element={<QRCode />} />
+          <Route path="checkout" element={<Checkout />} />
         </Route>
       </Routes>
     </CartProvider>

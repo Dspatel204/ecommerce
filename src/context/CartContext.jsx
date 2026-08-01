@@ -21,6 +21,8 @@ export function CartProvider({ children }) {
     setCartData((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
+  const clearCart = useCallback(() => setCartData([]), []);
+
   const openCart = useCallback(() => setCartOpen(true), []);
   const closeCart = useCallback(() => setCartOpen(false), []);
   const toggleCart = useCallback(() => setCartOpen((prev) => !prev), []);
@@ -32,6 +34,7 @@ export function CartProvider({ children }) {
         cartCount: cartData.length,
         addToCart,
         removeFromCart,
+        clearCart,
         isCartOpen,
         openCart,
         closeCart,

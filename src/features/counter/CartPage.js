@@ -3,9 +3,15 @@ import axios from "axios";
 import { Box, Modal } from "@mui/material";
 import Slider from "react-slick";
 import { useCart } from "../../context/CartContext";
+import Pagination from "../../components/Pagination";
+
+const PAGE_SIZE = 16;
 
 export default function Cart() {
-  const [allProducts, setAllProducts] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const {
     cartData,
     addToCart,
@@ -17,15 +23,23 @@ export default function Cart() {
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
-        const response = await axios.get("https://dummyjson.com/products");
-        setAllProducts(response.data.products || []);
+        const response = await axios.get(
+          `https://dummyjson.com/products?limit=${PAGE_SIZE}&skip=${
+            (page - 1) * PAGE_SIZE
+          }`
+        );
+        setProducts(response.data.products || []);
+        setTotal(response.data.total || 0);
       } catch (error) {
         console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchProducts();
-  }, []);
+  }, [page]);
 
   const sliderSettings = {
     dots: true,
@@ -51,13 +65,17 @@ export default function Cart() {
         </button>
       </div>
 
-      {allProducts.length === 0 ? (
+      {loading ? (
         <div className="py-12 text-center text-gray-500 dark:text-gray-400">
           Loading products...
         </div>
+      ) : products.length === 0 ? (
+        <div className="py-12 text-center text-gray-500 dark:text-gray-400">
+          No products found.
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {allProducts.map((item) => (
+          {products.map((item) => (
             <div key={item.id} className="card">
               <img
                 src={item.images[0]}
@@ -78,6 +96,13 @@ export default function Cart() {
           ))}
         </div>
       )}
+
+      <Pagination
+        current={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
 
       {/* Cart Modal */}
       <Modal

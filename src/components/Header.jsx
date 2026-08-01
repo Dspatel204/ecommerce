@@ -8,6 +8,7 @@ const navItems = [
   { name: "Products", to: "/products" },
   { name: "Categories", to: "/categories" },
   { name: "QR Code", to: "/qr-code" },
+  { name: "Checkout", to: "/checkout" },
 ];
 
 const activeClass =
