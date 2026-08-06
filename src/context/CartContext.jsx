@@ -12,8 +12,26 @@ export function CartProvider({ children }) {
   const [isCartOpen, setCartOpen] = useState(false);
 
   const addToCart = useCallback((item) => {
+    setCartData((prev) => {
+      const existing = prev.find((i) => i.id === item.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.id === item.id ? { ...i, quantity: (i.quantity || 1) + 1 } : i
+        );
+      }
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  }, []);
+
+  const updateQuantity = useCallback((id, delta) => {
     setCartData((prev) =>
-      prev.some((i) => i.id === item.id) ? prev : [...prev, item]
+      prev
+        .map((i) =>
+          i.id === id
+            ? { ...i, quantity: Math.max(1, (i.quantity || 1) + delta) }
+            : i
+        )
+        .filter((i) => (i.quantity || 1) > 0)
     );
   }, []);
 
@@ -33,6 +51,7 @@ export function CartProvider({ children }) {
         cartData,
         cartCount: cartData.length,
         addToCart,
+        updateQuantity,
         removeFromCart,
         clearCart,
         isCartOpen,

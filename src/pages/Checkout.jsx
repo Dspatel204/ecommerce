@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { payWithRazorpay } from "../utils/razorpay";
@@ -21,6 +22,7 @@ const formFields = [
 
 export default function Checkout() {
   const { cartData, removeFromCart, clearCart } = useCart();
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -86,14 +88,10 @@ export default function Checkout() {
           email: form.email,
           contact: form.phone,
         },
-        // Embedded mode: renders the Razorpay form inline inside #razorpay-embed
-        containerId: "razorpay-embed",
         onSuccess: () => {
           setPaid(true);
           clearCart();
-        },
-        onDismiss: () => {
-          setLoading(false);
+          navigate("/billing");
         },
       });
     } catch (err) {
@@ -196,8 +194,15 @@ export default function Checkout() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => removeFromCart(item.id)}
-                    className="shrink-0 rounded-md p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Remove "${item.title}" from cart?`
+                        )
+                      )
+                        removeFromCart(item.id);
+                    }}
+                    className="shrink-0 rounded-md p-1.5 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                     aria-label={`Remove ${item.title}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -249,13 +254,6 @@ export default function Checkout() {
               {apiError}
             </p>
           )}
-
-          {/* Razorpay embedded checkout container — the payment iframe renders here */}
-          <div
-            id="razorpay-embed"
-            className="w-full overflow-hidden rounded-xl"
-            style={{ minHeight: loading ? "420px" : "0" }}
-          />
 
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
             Test gateway — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry &amp; any CVV.
